@@ -160,46 +160,14 @@ raspi_gpio_write(struct file *filp,
                  size_t count,
                  loff_t *f_pos)
 {
-    unsigned int gpio, len = 0, value = 0;
-    char kbuf[BUF_SIZE];
-
-    printk(KERN_INFO "0: \n");
+    unsigned int gpio;
     gpio = iminor(filp->f_path.dentry->d_inode);
 
-    len = count < BUF_SIZE ? count - 1 : BUF_SIZE - 1;
-    printk(KERN_INFO "1: \n");
-    if (copy_from_user(kbuf, buf, len) != 0)
-        return -EFAULT;
-    printk(KERN_INFO "2: \n");
-    kbuf[len] = '\0';
-    printk(KERN_INFO "Request from user: %s\n", kbuf);
-    // Check the content of kbuf and set GPIO pin accordingly
+    printk(KERN_INFO "User tried to write GPIO %d\n", gpio);
 
-    if ((strcmp(kbuf, "1") == 0) || (strcmp(kbuf, "0") == 0))
-    {
-        printk(KERN_INFO "3: \n");
-        sscanf(kbuf, "%d", &value);
-
-        printk(KERN_INFO "4: \n");
-        if (value > 0)
-        {
-            gpio_set_value(gpio, high);
-        }
-        else
-        {
-            gpio_set_value(gpio, low);
-        }
-    }
-
-    else
-    {
-        printk(KERN_ERR "Invalid value\n");
-        return -EINVAL;
-    }
-
-    *f_pos += count;
     return count;
 }
+
 /*
  * raspi_gpio_init - Initialize GPIO device driver
  *
@@ -241,12 +209,12 @@ raspi_gpio_init(void)
                 printk("Bad kmalloc\n");
                 return -ENOMEM;
             }
-            if (gpio_request_one(pins[i], GPIOF_OUT_INIT_LOW, NULL) < 0)
+            if (gpio_request_one(pins[i], GPIOF_IN, NULL) < 0)
             {
                 printk(KERN_ALERT "Error requesting GPIO %d\n", pins[i]);
                 return -ENODEV;
             }
-            raspi_gpio_devp[index]->dir = out;
+            raspi_gpio_devp[index]->dir = in;
             raspi_gpio_devp[index]->cdev.owner = THIS_MODULE;
             cdev_init(&raspi_gpio_devp[index]->cdev, &raspi_gpio_fops);
             if ((ret = cdev_add(&raspi_gpio_devp[index]->cdev,

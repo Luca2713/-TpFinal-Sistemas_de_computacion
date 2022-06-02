@@ -38,5 +38,3 @@ printf "All c code COMPILED...\n"
 #Levanto el servidor
 ./api/bin/api
 
-#Ejecuto el monitor gráfico
-python3 final_gui.py

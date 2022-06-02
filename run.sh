@@ -35,6 +35,8 @@ printf "api COMPILED...\n"cd ..
 cd ..
 printf "All c code COMPILED...\n"
 
+insmod char_device_driver/sensors_driver.ko
+
 #Levanto el servidor
 ./api/bin/api
 

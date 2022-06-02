@@ -1,0 +1,6 @@
+make --dry-run --always-make --keep-going --print-directory
+make: Entering directory '/home/juanmagil/MEGA/Facultad/Sistemas de computación/ProyectoFinal/-TpFinal-Sistemas_de_computacion'
+make: Leaving directory '/home/juanmagil/MEGA/Facultad/Sistemas de computación/ProyectoFinal/-TpFinal-Sistemas_de_computacion'
+ 
+make: *** No targets specified and no makefile found.  Stop.
+

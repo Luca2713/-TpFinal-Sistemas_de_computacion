@@ -16,25 +16,28 @@
 #include <linux/spinlock.h>
 #include <linux/interrupt.h>
 #include <linux/time.h>
+#include <linux/vmalloc.h>
 
 /* User-defined macros */
-#define NUM_GPIO_PINS 2
+#define NUM_GPIO_PINS 5
+#define NUM_DEVICE 2
 #define DEVICE_NAME "raspi-gpio"
 #define BUF_SIZE 512
 
 /* User-defined data types */
-unsigned int pins[] = {20, 21};
+unsigned int device[] = {20, 21};
+unsigned int gpio[] = {19, 16, 26, 20, 21};
 
 enum state
 {
-    low,
-    high
+  low,
+  high
 };
 
 enum direction
 {
-    in,
-    out
+  in,
+  out
 };
 
 /*
@@ -45,9 +48,9 @@ enum direction
  */
 struct raspi_gpio_dev
 {
-    struct cdev cdev;
-    struct gpio pin;
-    enum direction dir;
+  struct cdev cdev;
+  struct gpio pin;
+  enum direction dir;
 };
 
 /* Declaration of entry points */
@@ -87,10 +90,10 @@ static struct class *raspi_gpio_class;
  */
 static int raspi_gpio_open(struct inode *inode, struct file *filp)
 {
-    unsigned int gpio = iminor(inode);
-    printk(KERN_INFO "GPIO[%d] opened\n", gpio);
+  unsigned int gpio = iminor(inode);
+  printk(KERN_INFO "GPIO[%d] opened\n", gpio);
 
-    return 0;
+  return 0;
 }
 /*
  * raspi_gpio_release - Release GPIO pin
@@ -98,10 +101,10 @@ static int raspi_gpio_open(struct inode *inode, struct file *filp)
 static int
 raspi_gpio_release(struct inode *inode, struct file *filp)
 {
-    unsigned int gpio = iminor(inode);
-    printk(KERN_INFO "Closing GPIO %d\n", gpio);
+  unsigned int gpio = iminor(inode);
+  printk(KERN_INFO "Closing GPIO %d\n", gpio);
 
-    return 0;
+  return 0;
 }
 
 /*
@@ -116,56 +119,76 @@ raspi_gpio_read(struct file *filp,
                 size_t count,
                 loff_t *f_pos)
 {
-    unsigned int gpio;
-    gpio = iminor(filp->f_path.dentry->d_inode);
+  unsigned int gpio;
+  int nr_bytes, valor;
+  char *gpio_state = vmalloc(128);
+  struct timespec timestamp_one, timestamp_two;
 
-    char gpio_state = 0;
+  if ((*f_pos) > 0) /* Tell the application that there is nothing left to read */
+    return 0;
 
-    // reading GPIO value
-    gpio_state = '0' + gpio_get_value(gpio);
+  gpio = iminor(filp->f_path.dentry->d_inode);
 
-    // write to user
-    count = 1;
+  // write to user
+  switch (gpio)
+  {
+  case 20:
+    valor = (gpio_get_value(20) + gpio_get_value(26) * 2 + gpio_get_value(16) * 4 + gpio_get_value(19) * 8) * (100 / 15);
 
-    if (*f_pos == 0)
-    {
-        if (put_user(gpio_state, buf) != 0)
-        {
-            pr_err("ERROR: Not all the bytes have been copied to user\n");
-            return -EFAULT;
-        }
-        else
-        {
-            (*f_pos)++;
-            pr_info("Read function : GPIO %d = %d \n", gpio, gpio_state);
-            return count;
-        }
-    }
-    else
-    {
-        return 0;
-    }
+    sprintf(gpio_state, "%d", valor);
+    break;
+  case 21:
+    while (gpio_get_value(21) == 0){}
+    
+    getnstimeofday(&timestamp_one);
+    
+    while (gpio_get_value(21) == 1){}
+
+    while (gpio_get_value(21) == 0){}
+
+    getnstimeofday(&timestamp_two);
+
+    sprintf(gpio_state, "%ld", (long int) 1e9/(timestamp_two.tv_nsec - timestamp_one.tv_nsec));
+    break;
+  }
+
+  nr_bytes = strlen(gpio_state);
+
+  if (count < nr_bytes)
+    return -ENOSPC;
+
+  /* Transfiere data desde el espacio de kernel al espacio de usuario */
+  /* cat /proc/clipboard                                              */
+
+  if (copy_to_user(buf, gpio_state, nr_bytes))
+    return -EINVAL;
+
+  (*f_pos) += count; /* Update the file pointer */
+
+  vfree(gpio_state);
+
+  return nr_bytes;
 }
 /*
-* raspi_gpio_write - Write to GPIO pin
-*
-* Set GPIO pin logic level (high/low)
-Description
-* "1" Set GPIO pin logic level to high
-* "0" Set GPIO pin logic level to low
-*/
+ * raspi_gpio_write - Write to GPIO pin
+ *
+ * Set GPIO pin logic level (high/low)
+ Description
+ * "1" Set GPIO pin logic level to high
+ * "0" Set GPIO pin logic level to low
+ */
 static ssize_t
 raspi_gpio_write(struct file *filp,
                  const char *buf,
                  size_t count,
                  loff_t *f_pos)
 {
-    unsigned int gpio;
-    gpio = iminor(filp->f_path.dentry->d_inode);
+  unsigned int gpio;
+  gpio = iminor(filp->f_path.dentry->d_inode);
 
-    printk(KERN_INFO "User tried to write GPIO %d\n", gpio);
+  printk(KERN_INFO "User tried to write GPIO %d\n", gpio);
 
-    return count;
+  return count;
 }
 
 /*
@@ -182,74 +205,79 @@ raspi_gpio_write(struct file *filp,
 static int __init
 raspi_gpio_init(void)
 {
-    int i, ret, index = 0;
+  int i, ret, index = 0;
 
-    if (alloc_chrdev_region(&first,
-                            0,
-                            NUM_GPIO_PINS,
-                            DEVICE_NAME) < 0)
+  if (alloc_chrdev_region(&first,
+                          0,
+                          NUM_GPIO_PINS,
+                          DEVICE_NAME) < 0)
+  {
+    printk(KERN_DEBUG "Cannot register device\n");
+    return -1;
+  }
+  if ((raspi_gpio_class = class_create(THIS_MODULE,
+                                       DEVICE_NAME)) == NULL)
+  {
+    printk(KERN_DEBUG "Cannot create class %s\n", DEVICE_NAME);
+    unregister_chrdev_region(first, NUM_GPIO_PINS);
+    return -EINVAL;
+  }
+  for (i = 0; i < NUM_DEVICE; i++)
+  {
     {
-        printk(KERN_DEBUG "Cannot register device\n");
-        return -1;
-    }
-    if ((raspi_gpio_class = class_create(THIS_MODULE,
-                                         DEVICE_NAME)) == NULL)
-    {
-        printk(KERN_DEBUG "Cannot create class %s\n", DEVICE_NAME);
-        unregister_chrdev_region(first, NUM_GPIO_PINS);
-        return -EINVAL;
-    }
-    for (i = 0; i < NUM_GPIO_PINS; i++)
-    {
+      raspi_gpio_devp[index] = kmalloc(sizeof(struct raspi_gpio_dev),
+                                       GFP_KERNEL);
+      if (!raspi_gpio_devp[index])
+      {
+        printk("Bad kmalloc\n");
+        return -ENOMEM;
+      }
+      raspi_gpio_devp[index]->dir = in;
+      raspi_gpio_devp[index]->cdev.owner = THIS_MODULE;
+      cdev_init(&raspi_gpio_devp[index]->cdev, &raspi_gpio_fops);
+      if ((ret = cdev_add(&raspi_gpio_devp[index]->cdev,
+                          (first + device[i]),
+                          1)))
+      {
+        printk(KERN_ALERT "Error %d adding cdev\n", ret);
+        for (i = 0; i < NUM_DEVICE; i++)
         {
-            raspi_gpio_devp[index] = kmalloc(sizeof(struct raspi_gpio_dev),
-                                             GFP_KERNEL);
-            if (!raspi_gpio_devp[index])
-            {
-                printk("Bad kmalloc\n");
-                return -ENOMEM;
-            }
-            if (gpio_request_one(pins[i], GPIOF_IN, NULL) < 0)
-            {
-                printk(KERN_ALERT "Error requesting GPIO %d\n", pins[i]);
-                return -ENODEV;
-            }
-            raspi_gpio_devp[index]->dir = in;
-            raspi_gpio_devp[index]->cdev.owner = THIS_MODULE;
-            cdev_init(&raspi_gpio_devp[index]->cdev, &raspi_gpio_fops);
-            if ((ret = cdev_add(&raspi_gpio_devp[index]->cdev,
-                                (first + pins[i]),
-                                1)))
-            {
-                printk(KERN_ALERT "Error %d adding cdev\n", ret);
-                for (i = 0; i < NUM_GPIO_PINS; i++)
-                {
-
-                    device_destroy(raspi_gpio_class,
-                                   MKDEV(MAJOR(first),
-                                         MINOR(first) + pins[i]));
-                }
-                class_destroy(raspi_gpio_class);
-                unregister_chrdev_region(first, NUM_GPIO_PINS);
-                return ret;
-            }
-            if (device_create(raspi_gpio_class,
-                              NULL,
-                              MKDEV(MAJOR(first), MINOR(first) + pins[i]),
-                              NULL,
-                              "raspiGpio%d",
-                              pins[i]) == NULL)
-            {
-                class_destroy(raspi_gpio_class);
-                unregister_chrdev_region(first, NUM_GPIO_PINS);
-                return -1;
-            }
-            index++;
+          device_destroy(raspi_gpio_class,
+                         MKDEV(MAJOR(first),
+                               MINOR(first) + device[i]));
         }
+        class_destroy(raspi_gpio_class);
+        unregister_chrdev_region(first, NUM_GPIO_PINS);
+        return ret;
+      }
+      if (device_create(raspi_gpio_class,
+                        NULL,
+                        MKDEV(MAJOR(first), MINOR(first) + device[i]),
+                        NULL,
+                        "raspiGpio%d",
+                        device[i]) == NULL)
+      {
+        class_destroy(raspi_gpio_class);
+        unregister_chrdev_region(first, NUM_GPIO_PINS);
+        return -1;
+      }
+      index++;
     }
+  }
 
-    printk("RaspberryPi GPIO driver initialized\n");
-    return 0;
+  for (i = 0; i < NUM_GPIO_PINS; i++)
+  {
+    {
+      if (gpio_request_one(gpio[i], GPIOF_IN, NULL) < 0)
+      {
+        printk(KERN_ALERT "Error requesting GPIO %d\n", gpio[i]);
+        return -ENODEV;
+      }
+    }
+  }
+
+  printk("RaspberryPi GPIO driver initialized\n");
+  return 0;
 }
 /*
  * raspi_gpio_exit - Clean up GPIO device driver when unloaded
@@ -264,19 +292,24 @@ raspi_gpio_init(void)
 static void __exit
 raspi_gpio_exit(void)
 {
-    int i = 0;
-    unregister_chrdev_region(first, NUM_GPIO_PINS);
-    for (i = 0; i < NUM_GPIO_PINS; i++)
-        kfree(raspi_gpio_devp[i]);
-    for (i = 0; i < NUM_GPIO_PINS; i++)
-    {
-        gpio_direction_output(pins[i], 0);
-        device_destroy(raspi_gpio_class,
-                       MKDEV(MAJOR(first), MINOR(first) + pins[i]));
-        gpio_free(pins[i]);
-    }
-    class_destroy(raspi_gpio_class);
-    printk(KERN_INFO "RaspberryPi GPIO driver removed\n");
+  int i = 0;
+  unregister_chrdev_region(first, NUM_DEVICE);
+  for (i = 0; i < NUM_DEVICE; i++)
+    kfree(raspi_gpio_devp[i]);
+  for (i = 0; i < NUM_DEVICE; i++)
+  {
+    device_destroy(raspi_gpio_class,
+                   MKDEV(MAJOR(first), MINOR(first) + device[i]));
+  }
+
+  for (i = 0; i < NUM_GPIO_PINS; i++)
+  {
+    gpio_direction_output(gpio[i], 0);
+    gpio_free(gpio[i]);
+  }
+
+  class_destroy(raspi_gpio_class);
+  printk(KERN_INFO "RaspberryPi GPIO driver removed\n");
 }
 module_init(raspi_gpio_init);
 module_exit(raspi_gpio_exit);

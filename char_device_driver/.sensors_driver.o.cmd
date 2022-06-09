@@ -908,6 +908,9 @@ deps_/home/luca123/Documents/Tp-final/char_device_driver/sensors_driver.o := \
   arch/arm64/include/asm/hardirq.h \
   arch/arm64/include/asm/kvm_arm.h \
   include/linux/irq_cpustat.h \
+  include/linux/delay.h \
+  arch/arm64/include/generated/asm/delay.h \
+  include/asm-generic/delay.h \
 
 /home/luca123/Documents/Tp-final/char_device_driver/sensors_driver.o: $(deps_/home/luca123/Documents/Tp-final/char_device_driver/sensors_driver.o)
 

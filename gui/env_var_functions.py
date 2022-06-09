@@ -19,7 +19,7 @@ def get_endpoint():
         
 def get_raspi_p1():
     try:
-        return os.environ['RASPI_P1']
+        return int(os.environ['RASPI_P1'])
     except KeyError:
         print(
             '[error]: `RASPI_P1` environment variable required\n')
@@ -27,7 +27,7 @@ def get_raspi_p1():
         
 def get_raspi_p2():
     try:
-        return os.environ['RASPI_P2']
+        return int(os.environ['RASPI_P2'])
     except KeyError:
         print(
             '[error]: `RASPI_P2` environment variable required\n')

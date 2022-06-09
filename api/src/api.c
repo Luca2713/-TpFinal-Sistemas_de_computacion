@@ -1,12 +1,18 @@
 #include "./funciones.c"
 #include <stdio.h>
 
-#define PUERTO 6666
 #define GPIO "puerto"
 
 int main()
 {
-    uint puerto = PUERTO;
+    char *puerto_str = getenv("PORT");
+    if (puerto_str == NULL)
+    {
+        perror("Error obteniendo la variable de entorno, abortando...");
+        return EXIT_FAILURE;
+    }
+
+    uint puerto = (uint)atoi(puerto_str);
 
     struct _u_instance instancia_de_api;
 

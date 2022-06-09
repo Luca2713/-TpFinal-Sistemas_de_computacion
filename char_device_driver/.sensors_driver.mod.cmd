@@ -1,0 +1,1 @@
+cmd_/home/luca123/Documents/Tp-final/char_device_driver/sensors_driver.mod := { echo  /home/luca123/Documents/Tp-final/char_device_driver/sensors_driver.o;  echo; } > /home/luca123/Documents/Tp-final/char_device_driver/sensors_driver.mod

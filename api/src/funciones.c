@@ -18,7 +18,7 @@ static int gpio(const struct _u_request *request,
 
     int fd;
     char path[1024];
-    char readBuf[2];
+    char readBuf[128];
 
     json_t *json_request = ulfius_get_json_body_request(request, NULL);
 
@@ -44,13 +44,11 @@ static int gpio(const struct _u_request *request,
     snprintf(path, sizeof(path), "/dev/raspiGpio%d", gpio);
     fd = open(path, O_RDWR);
 
-    if (read(fd, readBuf, 1) < 1)
+    if (read(fd, readBuf, 128) == -1)
     {
         perror("write, set pin input");
         return U_CALLBACK_ERROR;
     }
-
-    readBuf[1] = '\0';
 
     long long valor = atoll(readBuf);
 

@@ -50,6 +50,9 @@ def draw_figure(canvas, figure, loc=(0, 0)):
 
 def main():
     global port
+    global time_s
+    global x_vals
+    global y_vals
 
     # define the form layout
     layout = [[sg.Text('Animated Matplotlib', size=(40, 1),
@@ -80,6 +83,10 @@ def main():
         event, values = window.read(timeout=10)
 
         if(event == "Toggle"):
+            time_s = 0
+            x_vals = np.zeros(10)
+            y_vals = np.zeros(10)
+            
             if(port == env.get_raspi_p2()):
                 port = env.get_raspi_p1()
             else:

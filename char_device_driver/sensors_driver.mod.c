@@ -47,6 +47,7 @@ __used __section(__versions) = {
 	{ 0xf3ecac14, "cpu_hwcap_keys" },
 	{ 0x14b89635, "arm64_const_caps_ready" },
 	{ 0x3c3ff9fd, "sprintf" },
+	{ 0xf9a482f9, "msleep" },
 	{ 0x9ec6ca96, "ktime_get_real_ts64" },
 	{ 0x541b94d8, "gpiod_get_raw_value" },
 	{ 0xa95af66b, "gpio_to_desc" },
@@ -61,4 +62,4 @@ __used __section(__versions) = {
 MODULE_INFO(depends, "");
 
 
-MODULE_INFO(srcversion, "79B566BA70B8EEC29EB59BD");
+MODULE_INFO(srcversion, "44A2AC2B9B6B60B0689CBD9");

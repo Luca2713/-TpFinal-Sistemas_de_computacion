@@ -16,6 +16,7 @@
 #include <linux/spinlock.h>
 #include <linux/interrupt.h>
 #include <linux/time.h>
+#include <linux/delay.h>
 #include <linux/vmalloc.h>
 
 /* User-defined macros */
@@ -23,6 +24,8 @@
 #define NUM_DEVICE 2
 #define DEVICE_NAME "raspi-gpio"
 #define BUF_SIZE 512
+#define NANO 1000000000L
+
 
 /* User-defined data types */
 unsigned int device[] = {20, 21};
@@ -133,7 +136,8 @@ raspi_gpio_read(struct file *filp,
   switch (gpio)
   {
   case 20:
-    valor = (gpio_get_value(20) + gpio_get_value(26) * 2 + gpio_get_value(16) * 4 + gpio_get_value(19) * 8) * (100 / 15);
+    valor = ((gpio_get_value(20) + gpio_get_value(26) * 2 + gpio_get_value(16) *
+        4 + gpio_get_value(19) * 8) * 100 / 15);
 
     sprintf(gpio_state, "%d", valor);
     break;
@@ -141,6 +145,7 @@ raspi_gpio_read(struct file *filp,
     while (gpio_get_value(21) == 0){}
     
     getnstimeofday(&timestamp_one);
+    msleep(150);
     
     while (gpio_get_value(21) == 1){}
 
@@ -148,7 +153,10 @@ raspi_gpio_read(struct file *filp,
 
     getnstimeofday(&timestamp_two);
 
-    sprintf(gpio_state, "%ld", (long int) 1e9/(timestamp_two.tv_nsec - timestamp_one.tv_nsec));
+    sprintf(gpio_state, "%ld", (long int) 
+        ((timestamp_two.tv_sec*NANO+timestamp_two.tv_nsec)- 
+         (timestamp_one.tv_sec*NANO+timestamp_one.tv_nsec))/1000000);
+
     break;
   }
 
